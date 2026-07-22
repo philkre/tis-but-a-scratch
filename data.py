@@ -5,7 +5,7 @@ import os
 DATA_DIR = "data_cache"
 
 
-def load_mnist(seed=1004):
+def load_mnist(seed=1004) -> tuple[np.ndarray, ...]:
     """
     Returns (x_train, y_train, x_val, y_val, x_test, y_test).
 
