@@ -40,3 +40,30 @@ class Dense:
         self.grads["W"] = self.x.T @ dout
         self.grads["b"] = np.sum(dout, axis=0, keepdims=True)
         return dout @ self.params["W"].T
+
+
+class ReLU:
+    """
+    Creates a ReLU activation layer with forward and backward methods.
+    """
+
+    def __init__(self):
+        self.grads = {}
+        self.params = {}
+        self.x = None
+
+    def forward(self, x) -> np.ndarray:
+        """
+        x: (N, D) -> returns (N, D)
+        """
+        self.x = x
+        return np.maximum(0, x)
+
+    def backward(self, dout) -> np.ndarray:
+        """
+        dout: (N, D)
+        returns: (N, D)
+        """
+        dx = dout.copy()
+        dx[self.x <= 0] = 0
+        return dx

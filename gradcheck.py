@@ -1,5 +1,5 @@
 import numpy as np
-from layers import Dense
+from layers import Dense, ReLU
 
 
 def numerical_gradient(f, x, eps=1e-5) -> np.ndarray:
@@ -89,4 +89,13 @@ def check_dense():
     out_feats = 3
     layer = Dense(in_feats, out_feats)
     x = np.random.randn(4, in_feats)
+    return check_layer(layer, x)
+
+
+def check_relu():
+    """
+    Check ReLU layer gradients using check_layer.
+    """
+    layer = ReLU()
+    x = np.random.randn(4, 5)
     return check_layer(layer, x)
