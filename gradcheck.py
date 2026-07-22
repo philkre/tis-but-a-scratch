@@ -1,5 +1,5 @@
 import numpy as np
-from layers import Dense, ReLU
+from layers import Dense, ReLU, SoftmaxCrossEntropy, Flatten
 
 
 def numerical_gradient(f, x, eps=1e-5) -> np.ndarray:
@@ -32,6 +32,10 @@ def numerical_gradient(f, x, eps=1e-5) -> np.ndarray:
     return grad
 
 
+def relative_error(a, b):
+    return np.max(np.abs(a - b) / (np.maximum(1e-8, np.abs(a) + np.abs(b))))
+
+
 def check_layer(layer, x, tol=1e-5, seed=1004) -> bool:
     """
     Given a layer instance and a random small input x:
@@ -61,9 +65,6 @@ def check_layer(layer, x, tol=1e-5, seed=1004) -> bool:
             return np.sum(layer.forward(x) * dout)
 
         numerical_grads[name] = numerical_gradient(param_loss_fn, w)
-
-    def relative_error(a, b):
-        return np.max(np.abs(a - b) / (np.maximum(1e-8, np.abs(a) + np.abs(b))))
 
     # check relative error
     dx_error = relative_error(analytical_dx, numerical_dx)
@@ -97,5 +98,53 @@ def check_relu():
     Check ReLU layer gradients using check_layer.
     """
     layer = ReLU()
-    x = np.random.randn(4, 5)
+    x = np.random.randn(4, 5) + 0.5
     return check_layer(layer, x)
+
+
+def check_softmax_ce(x, y, tol=1e-5):
+    """
+    Check SoftmaxCrossEntropy layer gradients using numerical gradient checking.
+    """
+    layer = SoftmaxCrossEntropy()
+    layer.forward(x, y)
+    analytical_dx = layer.backward().copy()
+
+    def loss_wrt_x(x_):
+        return layer.forward(x_, y)
+
+    numerical_dx = numerical_gradient(loss_wrt_x, x)
+
+    error = relative_error(analytical_dx, numerical_dx)
+    assert error < tol, f"dx relative error {error} exceeds tolerance {tol}"
+    print("SoftmaxCrossEntropy gradient check passed.")
+    return True
+
+
+def check_softmax():
+    """
+    Check softmax layer
+    """
+    x = np.random.randn(4, 10)
+    y = np.zeros_like(x)
+    y[np.arange(4), np.random.randint(0, 10, size=4)] = 1
+    return check_softmax_ce(x, y)
+
+
+def check_flatten():
+    """
+    Check Flatten layer gradients using check_layer.
+    """
+    layer = Flatten()
+    x = np.random.randn(4, 3, 2, 3)
+    return check_layer(layer, x)
+
+
+def check_all():
+    """
+    Run all gradient checks.
+    """
+    check_dense()
+    check_relu()
+    check_softmax()
+    check_flatten()

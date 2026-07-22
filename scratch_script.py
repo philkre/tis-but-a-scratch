@@ -1,5 +1,5 @@
 from data import load_mnist
-from gradcheck import check_dense, check_relu
+from gradcheck import check_all
 
 x_train, y_train, x_val, y_val, x_test, y_test = load_mnist()
 assert x_train.shape == (55000, 1, 28, 28)
@@ -9,5 +9,4 @@ assert y_train.min() >= 0.0 and y_train.max() <= 1.0
 
 print("Data loaded successfully.")
 
-check_dense()
-check_relu()
+check_all()

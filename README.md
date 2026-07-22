@@ -34,7 +34,7 @@ Every layer is verified two ways before it's trusted:
 - [x] Numerical gradient-check harness (`gradcheck.py`)
 - [x] `Dense` layer, forward + backward
 - [x] `ReLU` layer, forward + backward
-- [ ] `SoftmaxCrossEntropy` loss layer
+- [x] `SoftmaxCrossEntropy` loss layer
 - [ ] `Flatten` layer
 - [ ] `MaxPool2D` layer
 - [ ] `im2col` / `col2im`
