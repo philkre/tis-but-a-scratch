@@ -1,4 +1,5 @@
 import numpy as np
+from layers import Dense
 
 
 def numerical_gradient(f, x, eps=1e-5) -> np.ndarray:
@@ -76,4 +77,16 @@ def check_layer(layer, x, tol=1e-5, seed=1004) -> bool:
             grad_error < tol
         ), f"gradient {name} relative error {grad_error} exceeds tolerance {tol}"
 
+    print("All gradient checks passed.")
     return True
+
+
+def check_dense():
+    """
+    Check Dense layer gradients using check_layer.
+    """
+    in_feats = 5
+    out_feats = 3
+    layer = Dense(in_feats, out_feats)
+    x = np.random.randn(4, in_feats)
+    return check_layer(layer, x)
