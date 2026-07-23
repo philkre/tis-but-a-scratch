@@ -1,5 +1,5 @@
 import numpy as np
-from layers import Dense, ReLU, SoftmaxCrossEntropy, Flatten
+from layers import Dense, ReLU, SoftmaxCrossEntropy, Flatten, MaxPool2D
 
 
 def numerical_gradient(f, x, eps=1e-5) -> np.ndarray:
@@ -140,6 +140,16 @@ def check_flatten():
     return check_layer(layer, x)
 
 
+def check_maxpool():
+    """
+    Check Maxpool2D gradients
+    """
+    x = np.random.randn(2, 3, 4, 4)
+    x += np.arange(x.size).reshape(x.shape) * 1e-3  # ensure unique values for maxpool
+    layer = MaxPool2D()
+    return check_layer(layer, x)
+
+
 def check_all():
     """
     Run all gradient checks.
@@ -148,3 +158,4 @@ def check_all():
     check_relu()
     check_softmax()
     check_flatten()
+    check_maxpool()

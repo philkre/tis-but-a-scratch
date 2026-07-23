@@ -35,8 +35,8 @@ Every layer is verified two ways before it's trusted:
 - [x] `Dense` layer, forward + backward
 - [x] `ReLU` layer, forward + backward
 - [x] `SoftmaxCrossEntropy` loss layer
-- [ ] `Flatten` layer
-- [ ] `MaxPool2D` layer
+- [x] `Flatten` layer
+- [x] `MaxPool2D` layer
 - [ ] `im2col` / `col2im`
 - [ ] `Conv2D` layer
 - [ ] `Sequential` model container

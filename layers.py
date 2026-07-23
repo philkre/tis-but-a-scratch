@@ -128,3 +128,80 @@ class Flatten:
         returns: (N, C, H, W)
         """
         return dout.reshape(self.x_shape)
+
+
+class MaxPool2D:
+    """
+    Creates a maxpool layer in two dimensions with forward and backward methods.
+    """
+
+    def __init__(self, pool_size: int = 2, stride: int = 2):
+        self.pool_size = pool_size
+        self.stride = stride
+        self.grads = {}
+        self.params = {}
+        self.x_shape = None
+        self.argmax_cache = None
+
+    def forward(self, x) -> np.ndarray:
+        """
+        x: (N, C, H, W) -> out: (N, C, H_out, W_out)
+        H_out = (H - pool_size) // stride + 1
+        W_out = (W - pool_size) // stride + 1
+        Cache argmax index per window
+        """
+        self.x_shape = x.shape
+        N, C, H, W = x.shape
+        H_out = (H - self.pool_size) // self.stride + 1
+        W_out = (W - self.pool_size) // self.stride + 1
+
+        out = np.zeros((N, C, H_out, W_out))
+        self.argmax_cache = np.zeros((N, C, H_out, W_out), dtype=int)
+
+        # iterate over output frame
+        for i in range(H_out):
+            for j in range(W_out):
+
+                # get window with stride and pool size
+                window = x[
+                    :,
+                    :,
+                    i * self.stride : i * self.stride + self.pool_size,
+                    j * self.stride : j * self.stride + self.pool_size,
+                ]
+                # flatten window
+                window_flat = window.reshape(N, C, -1)
+
+                # find max value in window and set output accordingly
+                out[:, :, i, j] = window_flat.max(axis=2)
+                # save max index to argmax cache
+                self.argmax_cache[:, :, i, j] = window_flat.argmax(axis=2)
+
+        return out
+
+    def backward(self, dout) -> np.ndarray:
+        """
+        dout: (N, C, H_out, W_out)
+        returns: (N, C, H, W)
+        """
+
+        # decode flat index
+        N, C, H_out, W_out = dout.shape
+        dx = np.zeros(self.x_shape)
+
+        for i in range(H_out):
+            for j in range(W_out):
+                flat_idx = self.argmax_cache[:, :, i, j]
+
+                row_offset = flat_idx // self.pool_size
+                col_offset = flat_idx % self.pool_size
+
+                n_idx, c_idx = np.indices((N, C))
+                dx[
+                    n_idx,
+                    c_idx,
+                    i * self.stride + row_offset,
+                    j * self.stride + col_offset,
+                ] += dout[:, :, i, j]
+
+        return dx
