@@ -1,5 +1,5 @@
 import numpy as np
-from layers import Dense, ReLU, SoftmaxCrossEntropy, Flatten, MaxPool2D
+from layers import *
 
 
 def numerical_gradient(f, x, eps=1e-5) -> np.ndarray:
@@ -150,6 +150,28 @@ def check_maxpool():
     return check_layer(layer, x)
 
 
+def check_im2col2im():
+    """
+    Check im2col and col2im functions for consistency.
+    """
+    x = np.random.randn(2, 3, 4, 4)
+    kernel_h = 2
+    kernel_w = 2
+    stride = 2
+
+    # Convert to columns
+    cols = im2col(x, kernel_h, kernel_w, stride)
+
+    # Convert back to image
+    x_reconstructed = col2im(cols, x.shape, kernel_h, kernel_w, stride)
+
+    # Check if the reconstructed image is close to the original
+    error = relative_error(x, x_reconstructed)
+    assert error < 1e-5, f"im2col/col2im reconstruction error {error} exceeds tolerance"
+    print("im2col and col2im check passed.")
+    return True
+
+
 def check_all():
     """
     Run all gradient checks.
@@ -159,3 +181,4 @@ def check_all():
     check_softmax()
     check_flatten()
     check_maxpool()
+    check_im2col2im()

@@ -205,3 +205,62 @@ class MaxPool2D:
                 ] += dout[:, :, i, j]
 
         return dx
+
+
+def im2col(x, kernel_h, kernel_w, stride):
+    """
+    x: (N, C, H, W)
+    col: (C * kernel_h * kernel_w, N * out_h * out_w)
+        - each column is one flattened receptive field patch
+        - columns are ordered by (n, out_row, out_col)
+    """
+
+    N, C, H, W = x.shape
+    out_h = (H - kernel_h) // stride + 1
+    out_w = (W - kernel_w) // stride + 1
+
+    # windows: (N, C, H - kernel_h + 1, W - kernel_w + 1, kernel_h, kernel_w)
+    windows = np.lib.stride_tricks.sliding_window_view(
+        x, (kernel_h, kernel_w), axis=(2, 3)
+    )
+    # apply stride by subsampling window-position axes -> (N, C, out_h, out_w, kernel_h, kernel_w)
+    windows = windows[:, :, ::stride, ::stride, :, :]
+
+    # reorder to (C, kernel_h, kernel_w, N, out_h, out_w) then flatten each half
+    col = windows.transpose(1, 4, 5, 0, 2, 3).reshape(
+        C * kernel_h * kernel_w, N * out_h * out_w
+    )
+
+    return col
+
+
+def col2im(col, x_shape, kernel_h, kernel_w, stride):
+    """
+    col: (C * kernel_h * kernel_w, N * out_h * out_w)
+    x_shape: (N, C, H, W)
+    returns: (N, C, H, W)
+    """
+
+    N, C, H, W = x_shape
+    out_h = (H - kernel_h) // stride + 1
+    out_w = (W - kernel_w) // stride + 1
+
+    # reshape col to (C, kernel_h, kernel_w, N, out_h, out_w) -- inverse of im2col's transpose+reshape
+    col_reshaped = col.reshape(C, kernel_h, kernel_w, N, out_h, out_w)
+
+    # target (row, col) in x for every (kernel offset, output position) pair
+    row_idx = np.arange(kernel_h)[:, None] + stride * np.arange(out_h)[None, :]  # (kh, out_h)
+    col_idx = np.arange(kernel_w)[:, None] + stride * np.arange(out_w)[None, :]  # (kw, out_w)
+
+    # broadcast every index axis to col_reshaped's shape (C, kh, kw, N, out_h, out_w)
+    n_idx = np.arange(N).reshape(1, 1, 1, N, 1, 1)
+    c_idx = np.arange(C).reshape(C, 1, 1, 1, 1, 1)
+    r_idx = row_idx.reshape(1, kernel_h, 1, 1, out_h, 1)
+    w_idx = col_idx.reshape(1, 1, kernel_w, 1, 1, out_w)
+    n_b, c_b, r_b, w_b = np.broadcast_arrays(n_idx, c_idx, r_idx, w_idx)
+
+    # scatter-add, not assign: overlapping windows (stride < kernel_size) must accumulate
+    x = np.zeros(x_shape, dtype=col.dtype)
+    np.add.at(x, (n_b, c_b, r_b, w_b), col_reshaped)
+
+    return x
