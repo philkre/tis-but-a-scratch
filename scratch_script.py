@@ -1,5 +1,7 @@
 from data import load_mnist
 from gradcheck import check_all
+from model import Sequential
+from layers import *
 
 x_train, y_train, x_val, y_val, x_test, y_test = load_mnist()
 assert x_train.shape == (55000, 1, 28, 28)

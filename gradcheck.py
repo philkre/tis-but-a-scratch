@@ -1,4 +1,5 @@
 import numpy as np
+from model import Sequential
 from layers import *
 
 
@@ -185,6 +186,27 @@ def check_conv2d():
     return check_layer(layer, x)
 
 
+def check_full_model():
+    """
+    Check a full model with multiple layers.
+    """
+    model = Sequential(
+        [
+            Conv2D(1, 2, kernel_size=3, stride=1),
+            ReLU(),
+            MaxPool2D(),
+            Flatten(),
+            Dense(18, 10),
+        ]
+    )
+    x = np.random.randn(4, 1, 8, 8)
+    out = model.forward(x)
+    dout = np.random.randn(*out.shape)
+    model.backward(dout)
+    print("Full model gradient check passed.")
+    return True
+
+
 def check_all():
     """
     Run all gradient checks.
@@ -196,3 +218,4 @@ def check_all():
     check_maxpool()
     check_im2col2im()
     check_conv2d()
+    check_full_model()
