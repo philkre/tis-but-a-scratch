@@ -249,8 +249,12 @@ def col2im(col, x_shape, kernel_h, kernel_w, stride):
     col_reshaped = col.reshape(C, kernel_h, kernel_w, N, out_h, out_w)
 
     # target (row, col) in x for every (kernel offset, output position) pair
-    row_idx = np.arange(kernel_h)[:, None] + stride * np.arange(out_h)[None, :]  # (kh, out_h)
-    col_idx = np.arange(kernel_w)[:, None] + stride * np.arange(out_w)[None, :]  # (kw, out_w)
+    row_idx = (
+        np.arange(kernel_h)[:, None] + stride * np.arange(out_h)[None, :]
+    )  # (kh, out_h)
+    col_idx = (
+        np.arange(kernel_w)[:, None] + stride * np.arange(out_w)[None, :]
+    )  # (kw, out_w)
 
     # broadcast every index axis to col_reshaped's shape (C, kh, kw, N, out_h, out_w)
     n_idx = np.arange(N).reshape(1, 1, 1, N, 1, 1)
@@ -264,3 +268,83 @@ def col2im(col, x_shape, kernel_h, kernel_w, stride):
     np.add.at(x, (n_b, c_b, r_b, w_b), col_reshaped)
 
     return x
+
+
+class Conv2D:
+    """
+    Creates a 2D convolutional layer with forwad and backward methods.
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        stride: int = 1,
+        seed: int = 1004,
+    ):
+        rng = np.random.default_rng(seed)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+
+        # He initialization for weights
+        self.params = {
+            "W": rng.normal(0, 1, (out_channels, in_channels, kernel_size, kernel_size))
+            * np.sqrt(2 / (in_channels * kernel_size * kernel_size)),
+            "b": np.zeros((out_channels, 1)),
+        }
+
+        self.grads = {
+            "W": np.zeros_like(self.params["W"]),
+            "b": np.zeros_like(self.params["b"]),
+        }
+
+        self.x_shape = None
+        self.col_x = None
+        self.col_w = None
+
+    def forward(self, x) -> np.ndarray:
+        """
+        x: (N, in_channels, H, W) -> returns (N, out_channels, H_out, W_out)
+        """
+        self.x_shape = x.shape
+        N, C, H, W = self.x_shape
+
+        # compute output dimensions
+        H_out = (H - self.kernel_size) // self.stride + 1
+        W_out = (W - self.kernel_size) // self.stride + 1
+
+        # im2col
+        self.col_x = im2col(x, self.kernel_size, self.kernel_size, self.stride)
+        self.col_w = self.params["W"].reshape(self.out_channels, -1)
+
+        out = self.col_w @ self.col_x + self.params["b"]
+        out = out.reshape(self.out_channels, N, H_out, W_out).transpose(1, 0, 2, 3)
+
+        return out
+
+    def backward(self, dout) -> np.ndarray:
+        """
+        dout: (N, out_channels, H_out, W_out)
+        returns: (N, in_channels, H, W)
+        sets: self.grads["W"] (out_channels, in_channels, kernel_size, kernel_size), self.grads["b"] (out_channels, 1)
+        """
+        N, C_out, H_out, W_out = dout.shape
+
+        # reshape dout to match col_x shape
+        dout_reshaped = dout.transpose(1, 0, 2, 3).reshape(C_out, -1)
+
+        # compute gradients
+        self.grads["W"] = dout_reshaped @ self.col_x.T
+        self.grads["W"] = self.grads["W"].reshape(self.params["W"].shape)
+        self.grads["b"] = np.sum(dout_reshaped, axis=1, keepdims=True)
+
+        # compute dx
+        dcol_x = self.col_w.T @ dout_reshaped
+        dx = col2im(
+            dcol_x, self.x_shape, self.kernel_size, self.kernel_size, self.stride
+        )
+
+        return dx

@@ -172,6 +172,19 @@ def check_im2col2im():
     return True
 
 
+def check_conv2d():
+    """
+    Check Conv2D layer gradients using check_layer.
+    """
+    in_channels = 3
+    out_channels = 2
+    kernel_size = 3
+    stride = 1
+    layer = Conv2D(in_channels, out_channels, kernel_size, stride)
+    x = np.random.randn(2, in_channels, 5, 5)
+    return check_layer(layer, x)
+
+
 def check_all():
     """
     Run all gradient checks.
@@ -182,3 +195,4 @@ def check_all():
     check_flatten()
     check_maxpool()
     check_im2col2im()
+    check_conv2d()
