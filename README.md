@@ -1,6 +1,6 @@
 ## Building Interpretability Intuition from Scratch
 
-LeNet-ish CNN for MNIST, implemented from scratch in raw NumPy. My goal is deriving and hand coding to build mechanical understanding of CNNs to then later pose interpretability questions on that basis.
+A LeNet-ish CNN for MNIST, implemented from scratch in raw NumPy — no autograd, no `nn.Module`. Every forward and backward pass was derived and hand-coded to build real mechanical understanding of how a CNN works, as groundwork for the interpretability questions this project exists to ask.
 
 ### Architecture
 
@@ -21,26 +21,16 @@ FC3          84 → 10
 Softmax + Cross-Entropy loss
 ```
 
-### Correctness approach
+Convolution runs via im2col + matmul (vectorized with `sliding_window_view`, no Python loop over patches). Plain mini-batch SGD, no learning rate schedule, momentum, or regularization.
 
-Every layer is verified two ways before it's trusted:
+### Where things stand
 
-1. **Numerical gradient checking** — analytical gradients from each layer's hand-derived `backward()` are compared against finite-difference approximations on small random inputs, per layer, in isolation.
-2. **Overfit-a-tiny-batch smoke test** — once all layers pass their individual checks, the full wired-up model must be able to drive training accuracy on a handful of images to ~100%, proving the whole graph (forward, backward, optimizer) is integrated correctly before a full training run.
+The full pipeline is built and working: data loading and preprocessing, every layer (`Dense`, `ReLU`, `SoftmaxCrossEntropy`, `Flatten`, `MaxPool2D`, `Conv2D` with `im2col`/`col2im`), the `Sequential` container, `SGD`, a training loop with best-checkpoint saving, and evaluation with a confusion matrix.
 
-### Progress
+Every layer's hand-derived backward pass has been checked against numerical (finite-difference) gradients, and the fully wired model was confirmed to overfit a 10-image batch to 100% train accuracy before any real training run.
 
-- [x] Data pipeline (`data.py`) — MNIST via the `mnist` package, cached locally, normalized, split 55k/5k/10k, one-hot labels
-- [x] Numerical gradient-check harness (`gradcheck.py`)
-- [x] `Dense` layer, forward + backward
-- [x] `ReLU` layer, forward + backward
-- [x] `SoftmaxCrossEntropy` loss layer
-- [x] `Flatten` layer
-- [x] `MaxPool2D` layer
-- [ ] `im2col` / `col2im`
-- [ ] `Conv2D` layer
-- [ ] `Sequential` model container
-- [ ] `SGD` optimizer
-- [ ] Overfit-a-tiny-batch smoke test
-- [ ] Full training loop
-- [ ] Evaluation + confusion matrix
+A full run on the 55k-image training set currently reaches **87.1% accuracy** on the 5k validation set — below the 95% target, but the errors aren't random: they concentrate on the classic ambiguous MNIST pairs (4/9, 3/5, 3/8), which points to under-training rather than a bug. Next step is tuning epochs/learning rate before touching the architecture.
+
+### Next
+
+Moving into the actual point of the project: probing what the trained network represents. The current code caches what each layer needs for its own backward pass, but not much more — before running interpretability experiments it needs stable layer naming, a way to pull activations without them being overwritten by unrelated forward passes (e.g. validation runs during training), and persistence of activations/weights across training steps rather than just a single best-checkpoint.
