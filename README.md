@@ -21,6 +21,8 @@ FC3          84 → 10
 Softmax + Cross-Entropy loss
 ```
 
+![Network architecture diagram](img/architecture.png)
+
 Convolution runs via im2col + matmul (vectorized with `sliding_window_view`, no Python loop over patches). Plain mini-batch SGD, no learning rate schedule, momentum, or regularization.
 
 ### Where things stand
