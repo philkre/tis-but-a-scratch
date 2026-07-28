@@ -4,7 +4,14 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import Normalize
 
-from visualize import _grid_block_size, _column_block_size, BLOCK_KIND, SKIP_LAYERS, SHORT_NAME
+from visualize import (
+    _grid_block_size,
+    _column_block_size,
+    BLOCK_KIND,
+    SKIP_LAYERS,
+    LABELED_SKIP_LAYERS,
+    SHORT_NAME,
+)
 
 
 def _collect_activations(model, x):
@@ -16,6 +23,14 @@ def _collect_activations(model, x):
     nothing following (Pool1, Pool2, and the final FC3 logits) record
     their own raw output.
 
+    Intermediate Dense layers (every Dense except the last) are computed but
+    don't get their own block -- a hidden dense layer's per-neuron activation
+    has no spatial/positional meaning (neuron ordering is arbitrary), so a
+    dot column doesn't add real interpretability value for a single example.
+    Only the final Dense layer (the actual class logits, each with a fixed,
+    known meaning) is drawn. They're still folded into the arrow label like
+    ReLU/Flatten, so the diagram stays structurally honest about what ran.
+
     NOTE: mutates every layer's cached forward state, same caveat as
     visualize._collect_blocks -- don't call this between a real forward()
     and its matching backward().
@@ -25,6 +40,9 @@ def _collect_activations(model, x):
         arrow_labels: list of str, length len(blocks) - 1
     """
     layers = model.layers
+    dense_indices = [i for i, l in enumerate(layers) if type(l).__name__ == "Dense"]
+    last_dense_idx = dense_indices[-1] if dense_indices else None
+
     blocks = [{"label": "Input", "values": x[0], "kind": "grid"}]
     arrow_labels = []
     pending = []
@@ -38,8 +56,21 @@ def _collect_activations(model, x):
 
         if kind in SKIP_LAYERS:
             out = layer.forward(out)
-            pending.append(kind)
+            if kind in LABELED_SKIP_LAYERS:
+                pending.append(kind)
             i += 1
+            continue
+
+        if kind == "Dense" and i != last_dense_idx:
+            out = layer.forward(out)
+            counters[kind] += 1
+            pending.append(f"{SHORT_NAME[kind]}{counters[kind]}")
+            if i + 1 < len(layers) and type(layers[i + 1]).__name__ == "ReLU":
+                out = layers[i + 1].forward(out)
+                pending.append("ReLU")
+                i += 2
+            else:
+                i += 1
             continue
 
         out = layer.forward(out)
@@ -116,9 +147,10 @@ def _draw_column_block_colored(ax, x0, y_center, values, dot_size, dot_gap, cmap
 def _draw_activation_row(
     ax, blocks, arrow_labels, y_offset,
     cell_size, cell_gap, tile_gap, dot_size, dot_gap, block_gap, cmap,
-    row_label=None,
+    row_label=None, x_offset=0.0,
 ):
-    """Draws one example's full activation row, vertically centered at y_offset. Returns (total_width, row_height)."""
+    """Draws one example's full activation row, vertically centered at y_offset
+    and horizontally starting at x_offset. Returns (total_width, row_height)."""
     sizes = [
         (
             _grid_block_size(b["values"].shape, cell_size, tile_gap)
@@ -128,7 +160,7 @@ def _draw_activation_row(
         for b in blocks
     ]
 
-    x_cursor = 0.0
+    x_cursor = x_offset
     x_ranges = []
 
     for block, (width, height) in zip(blocks, sizes):
@@ -163,10 +195,10 @@ def _draw_activation_row(
             )
 
     if row_label:
-        ax.text(-0.6, y_offset, row_label, ha="right", va="center", fontsize=10, fontweight="bold")
+        ax.text(x_offset - 0.6, y_offset, row_label, ha="right", va="center", fontsize=10, fontweight="bold")
 
     row_height = max(h for _, h in sizes)
-    return x_cursor, row_height
+    return x_cursor - x_offset, row_height
 
 
 def plot_activations(
@@ -205,39 +237,53 @@ def plot_activations(
 def plot_activations_grid(
     model, X, y, save_path="img/activations_all_digits.png",
     cell_size=0.05, cell_gap=0.01, tile_gap=0.15,
-    dot_size=0.03, dot_gap=0.09, block_gap=1.0, row_gap=1.5,
-    cmap_name="inferno",
+    dot_size=0.03, dot_gap=0.09, block_gap=1.0, row_gap=1.5, col_gap=3.0,
+    n_cols=2, cmap_name="inferno",
 ):
     """
     One example per digit 0-9 (first occurrence in X/y), each drawn as its
-    own activation row (see plot_activations), stacked vertically so
-    layer-by-layer behavior can be compared across classes.
+    own activation row (see plot_activations), arranged in an n_cols x
+    (10 // n_cols) grid for side-by-side comparison. Column-major digit
+    order: the first column gets digits 0..(rows_per_col-1), the next
+    column gets the rest, and so on.
     """
     labels = np.argmax(y, axis=1)
     cmap = plt.get_cmap(cmap_name)
+    rows_per_col = 10 // n_cols
 
-    fig, ax = plt.subplots(figsize=(22, 30))
-    y_cursor = 0.0
-    max_width = 0.0
-    first_row_height = None
+    fig, ax = plt.subplots(figsize=(20 * n_cols, 3.2 * rows_per_col))
+
+    x_offset = 0.0
+    max_col_width = 0.0
+    row_height = None
+    min_y = 0.0
 
     for digit in range(10):
+        row_in_col = digit % rows_per_col
+
+        if row_in_col == 0 and digit > 0:
+            x_offset += max_col_width + col_gap
+            max_col_width = 0.0
+
+        y_offset = -row_in_col * (row_height + row_gap) if row_height else 0.0
+
         idx = np.where(labels == digit)[0][0]
         x = X[idx : idx + 1]
         blocks, arrow_labels = _collect_activations(model, x)
 
         width, height = _draw_activation_row(
-            ax, blocks, arrow_labels, y_cursor,
+            ax, blocks, arrow_labels, y_offset,
             cell_size, cell_gap, tile_gap, dot_size, dot_gap, block_gap, cmap,
-            row_label=f"Digit {digit}",
+            row_label=f"Digit {digit}", x_offset=x_offset,
         )
-        max_width = max(max_width, width)
-        if first_row_height is None:
-            first_row_height = height
-        y_cursor -= height + row_gap
+        max_col_width = max(max_col_width, width)
+        if row_height is None:
+            row_height = height
+        min_y = min(min_y, y_offset - height / 2)
 
-    ax.set_xlim(-2, max_width)
-    ax.set_ylim(y_cursor - 1, first_row_height / 2 + 1)
+    total_width = x_offset + max_col_width
+    ax.set_xlim(-2, total_width)
+    ax.set_ylim(min_y - 1, row_height / 2 + 1)
     ax.set_aspect("equal")
     ax.axis("off")
 

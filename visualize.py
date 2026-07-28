@@ -11,6 +11,9 @@ BLOCK_KIND = {
 }
 # layers that don't change shape -- folded into the label of the connecting arrow
 SKIP_LAYERS = {"ReLU", "Flatten"}
+# of those, which ones actually get a text label on the arrow (Flatten is implied
+# by the grid->column transition and just adds visual clutter, so it's silent)
+LABELED_SKIP_LAYERS = {"ReLU"}
 SHORT_NAME = {"Conv2D": "Conv", "MaxPool2D": "Pool", "Dense": "FC"}
 
 
@@ -39,7 +42,8 @@ def _collect_blocks(model, input_shape):
         x = layer.forward(x)
 
         if kind in SKIP_LAYERS:
-            pending.append(kind)
+            if kind in LABELED_SKIP_LAYERS:
+                pending.append(kind)
             continue
 
         counters[kind] += 1
