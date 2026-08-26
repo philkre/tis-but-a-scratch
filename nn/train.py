@@ -48,6 +48,7 @@ def train(
     batch_size=32,
     checkpoint_path="models/best_model.npz",
     seed=1004,
+    epoch_callback=None,
 ):
     rng = np.random.default_rng(seed)
     n_train = X_train.shape[0]
@@ -92,5 +93,8 @@ def train(
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             save_checkpoint(model, checkpoint_path)
+
+        if epoch_callback is not None:
+            epoch_callback(epoch, model)
 
     return history

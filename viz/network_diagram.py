@@ -1,7 +1,8 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+
+from viz.style import save
 
 # layers that define a new shape and get their own block in the diagram
 BLOCK_KIND = {
@@ -192,31 +193,12 @@ def plot_architecture(
     ax.set_aspect("equal")
     ax.axis("off")
 
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    fig.tight_layout()
-    fig.savefig(save_path, dpi=300)
-    plt.close(fig)
+    save(fig, save_path)
 
 
 if __name__ == "__main__":
-    from model import Sequential
-    from layers import Conv2D, ReLU, MaxPool2D, Flatten, Dense
+    from nn import build_model
 
-    model = Sequential(
-        [
-            Conv2D(1, 6, 5),
-            ReLU(),
-            MaxPool2D(2, 2),
-            Conv2D(6, 16, 5),
-            ReLU(),
-            MaxPool2D(2, 2),
-            Flatten(),
-            Dense(256, 120),
-            ReLU(),
-            Dense(120, 84),
-            ReLU(),
-            Dense(84, 10),
-        ]
-    )
+    model = build_model()
     plot_architecture(model)
     print("Architecture diagram saved to img/architecture.png")

@@ -1,6 +1,15 @@
 import numpy as np
-from model import Sequential
-from layers import *
+from nn.model import Sequential
+from nn.layers import (
+    Dense,
+    ReLU,
+    SoftmaxCrossEntropy,
+    Flatten,
+    MaxPool2D,
+    Conv2D,
+    im2col,
+    col2im,
+)
 
 
 def numerical_gradient(f, x, eps=1e-5) -> np.ndarray:

@@ -1,10 +1,11 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import Normalize
 
-from visualize import (
+from viz.style import save
+
+from viz.network_diagram import (
     _grid_block_size,
     _column_block_size,
     BLOCK_KIND,
@@ -228,10 +229,7 @@ def plot_activations(
     ax.set_aspect("equal")
     ax.axis("off")
 
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    fig.tight_layout()
-    fig.savefig(save_path, dpi=300)
-    plt.close(fig)
+    save(fig, save_path)
 
 
 def plot_activations_grid(
@@ -287,10 +285,7 @@ def plot_activations_grid(
     ax.set_aspect("equal")
     ax.axis("off")
 
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    fig.tight_layout()
-    fig.savefig(save_path, dpi=200)
-    plt.close(fig)
+    save(fig, save_path)
 
 
 def plot_filters(model, save_path="img/filters.png"):
@@ -314,34 +309,13 @@ def plot_filters(model, save_path="img/filters.png"):
         axes[c].set_title(f"Filter {c}", fontsize=8)
         axes[c].axis("off")
 
-    fig.tight_layout()
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    fig.savefig(save_path, dpi=300)
-    plt.close(fig)
+    save(fig, save_path)
 
 
 if __name__ == "__main__":
-    from data import load_mnist
-    from model import Sequential
-    from layers import Conv2D, ReLU, MaxPool2D, Flatten, Dense
-    from train import load_checkpoint
+    from nn import build_model, load_mnist, load_checkpoint
 
-    model = Sequential(
-        [
-            Conv2D(1, 6, 5),
-            ReLU(),
-            MaxPool2D(2, 2),
-            Conv2D(6, 16, 5),
-            ReLU(),
-            MaxPool2D(2, 2),
-            Flatten(),
-            Dense(256, 120),
-            ReLU(),
-            Dense(120, 84),
-            ReLU(),
-            Dense(84, 10),
-        ]
-    )
+    model = build_model()
     load_checkpoint(model, "models/best_model.npz")
 
     x_train, y_train, x_val, y_val, x_test, y_test = load_mnist()
