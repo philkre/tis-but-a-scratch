@@ -90,7 +90,7 @@ def train(
             f"val_loss {val_loss:.4f}  val_acc {val_acc:.4f}"
         )
 
-        if val_acc > best_val_acc:
+        if checkpoint_path is not None and val_acc > best_val_acc:
             best_val_acc = val_acc
             save_checkpoint(model, checkpoint_path)
 

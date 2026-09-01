@@ -65,3 +65,74 @@ def distance_from_init(model, init_params):
 def snapshot_params(model):
     """Copy of every weight matrix, for later comparison against."""
     return {name: W.copy() for name, W in _weighted_layers(model)}
+
+
+def power_law_alpha(model, tail_frac=0.5):
+    """
+    Hill-estimator tail exponent of each layer's eigenvalue spectrum.
+
+    Eigenvalues of W^T W are the squared singular values. Taking the largest
+    `tail_frac` of them, the maximum-likelihood exponent of a power law
+    p(x) ~ x^-alpha above x_min is
+
+        alpha = 1 + n / sum(ln(x_i / x_min))
+
+    Statistically fragile at this scale -- the largest weight matrix here has
+    120 eigenvalues, where published work uses matrices orders of magnitude
+    larger. Report it; don't let it lead a conclusion.
+    """
+    out = {}
+    for name, s in singular_values(model).items():
+        eig = np.sort(s**2)[::-1]
+        k = max(int(len(eig) * tail_frac), 2)
+        tail = eig[:k]
+        x_min = tail[-1]
+        logs = np.log(np.maximum(tail / max(x_min, 1e-30), 1.0 + 1e-12))
+        out[name] = float(1.0 + len(tail) / max(logs.sum(), 1e-30))
+    return out
+
+
+MEASURES = ("weight_norm", "distance_from_init", "stable_rank",
+            "spectral_entropy", "power_law_alpha")
+
+
+def collect_measures(model, init_params):
+    """
+    Every weight-only measure, flattened to {"measure/layer": value}.
+
+    Takes a model and its initial weights -- and nothing else. There is
+    deliberately no parameter through which data could enter, so no measure
+    can accidentally consume the test set it is meant to predict.
+    """
+    sources = {
+        "weight_norm": weight_norms(model),
+        "distance_from_init": distance_from_init(model, init_params),
+        "stable_rank": stable_rank(model),
+        "spectral_entropy": spectral_entropy(model),
+        "power_law_alpha": power_law_alpha(model),
+    }
+    return {f"{measure}/{layer}": value
+            for measure, per_layer in sources.items()
+            for layer, value in per_layer.items()}
+
+
+def _check_power_law_alpha():
+    """
+    Hill estimator against synthetic data with a known exponent.
+
+    Inverse-transform sampling: if x = x_min * (1-u)^(-1/(alpha-1)) for uniform
+    u, then x follows a power law with that exponent.
+    """
+    rng = np.random.default_rng(0)
+    true_alpha = 3.0
+    u = rng.random(20000)
+    x = (1 - u) ** (-1 / (true_alpha - 1))
+
+    tail = np.sort(x)[::-1][:10000]
+    x_min = tail[-1]
+    logs = np.log(np.maximum(tail / x_min, 1.0 + 1e-12))
+    est = 1.0 + len(tail) / logs.sum()
+
+    assert abs(est - true_alpha) < 0.15, f"Hill estimator gave {est:.3f}, expected ~{true_alpha}"
+    print(f"power_law_alpha check passed (recovered alpha={est:.3f} from synthetic alpha={true_alpha})")
+    return True
